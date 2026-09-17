@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     
     # Path pointing to your copied YOLOv12 weights
     MODEL_PATH: str = os.path.join(os.path.dirname(os.path.dirname(__file__)), "weights", "best.pt")
-    CONFIDENCE_THRESHOLD: float = 0.25
+    CONFIDENCE_THRESHOLD: float = 0.35
     IOU_THRESHOLD: float = 0.45
     
     # PCB Defect taxonomy mapping

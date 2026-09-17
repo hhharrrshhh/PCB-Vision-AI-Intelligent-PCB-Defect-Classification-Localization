@@ -7,6 +7,12 @@ import numpy as np
 from ultralytics import YOLO
 from backend.core.config import settings
 
+# Normalize class names from model output → repair_config / frontend keys.
+# best1.pt emits "short" for short-circuit defects; everything else expects "short_circuit".
+_CLASS_ALIASES: dict = {
+    "short": "short_circuit",
+}
+
 class YOLOService:
     def __init__(self):
         self.model_path = settings.MODEL_PATH
@@ -54,6 +60,7 @@ class YOLOService:
             class_names = result.names
             raw_class_name = class_names.get(cls_id, f"defect_{cls_id}")
             class_name = str(raw_class_name).lower().replace(" ", "_")
+            class_name = _CLASS_ALIASES.get(class_name, class_name)
             
             detected_defects.append({
                 "defect_id": idx + 1,

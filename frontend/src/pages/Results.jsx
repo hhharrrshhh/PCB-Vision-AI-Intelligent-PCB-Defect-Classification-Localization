@@ -4,9 +4,9 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import {
-  CheckCircle2, XCircle, FileText, FileJson, Download,
+  CheckCircle2, XCircle, FileJson, Download,
   Eye, EyeOff, ZoomIn, X, Wrench, AlertTriangle, Clock,
-  Gauge, IndianRupee, ArrowRight, Layers,
+  Gauge, IndianRupee,
 } from "lucide-react";
 import { GlassCard, SeverityPill } from "../components/Primitives";
 
@@ -129,81 +129,153 @@ function RepairViability({ analysis }) {
   );
 }
 
-// ── Interactive image viewer with bounding boxes ───────────────────────────────
+// ── Interactive image viewer — numbered markers + SVG leader lines ─────────────
 function PCBViewer({ imageUrl, defects, activeId, onHoverDefect }) {
   const containerRef = useRef(null);
-  const imgRef = useRef(null);
+  const imgRef       = useRef(null);
   const [renderedSize, setRenderedSize] = useState(null);
-  const [naturalSize, setNaturalSize] = useState(null);
+  const [naturalSize,  setNaturalSize]  = useState(null);
   const [showBoxes, setShowBoxes] = useState(true);
-  const [zoomed, setZoomed] = useState(false);
+  const [zoomed,    setZoomed]    = useState(false);
 
   useEffect(() => {
     if (!imgRef.current) return;
-    const updateSize = () => {
-      if (imgRef.current) {
+    const update = () => {
+      if (imgRef.current)
         setRenderedSize({ width: imgRef.current.clientWidth, height: imgRef.current.clientHeight });
-      }
     };
-    const ro = new ResizeObserver(updateSize);
+    const ro = new ResizeObserver(update);
     ro.observe(imgRef.current);
-    updateSize();
+    update();
     return () => ro.disconnect();
   }, [imageUrl]);
 
   const handleImgLoad = (e) => {
-    setNaturalSize({ width: e.target.naturalWidth, height: e.target.naturalHeight });
-    setRenderedSize({ width: e.target.clientWidth, height: e.target.clientHeight });
+    setNaturalSize({ width: e.target.naturalWidth,  height: e.target.naturalHeight });
+    setRenderedSize({ width: e.target.clientWidth,  height: e.target.clientHeight });
   };
 
-  const getBoxStyle = (bbox) => {
-    if (!naturalSize || !renderedSize) return {};
-    const scaleX = renderedSize.width  / naturalSize.width;
-    const scaleY = renderedSize.height / naturalSize.height;
+  // Scale a bbox from natural → rendered pixel space
+  const scaleBox = (bbox) => {
+    if (!naturalSize || !renderedSize) return null;
+    const sx = renderedSize.width  / naturalSize.width;
+    const sy = renderedSize.height / naturalSize.height;
     return {
-      left:   bbox.x_min * scaleX,
-      top:    bbox.y_min * scaleY,
-      width:  (bbox.x_max - bbox.x_min) * scaleX,
-      height: (bbox.y_max - bbox.y_min) * scaleY,
+      x:  bbox.x_min * sx,
+      y:  bbox.y_min * sy,
+      w:  (bbox.x_max - bbox.x_min) * sx,
+      h:  (bbox.y_max - bbox.y_min) * sy,
     };
   };
 
-  const ViewerContent = () => (
-    <div className="relative inline-block w-full">
-      <img
-        ref={imgRef}
-        src={imageUrl}
-        alt="PCB Inspection"
-        onLoad={handleImgLoad}
-        className="w-full h-auto object-contain max-h-[480px] block rounded-xl"
-      />
-      {showBoxes && defects.map((d) => {
-        const c = getColor(d.class_name);
-        const style = getBoxStyle(d.bbox);
-        const isActive = activeId === d.defect_id;
-        return (
-          <div
-            key={d.defect_id}
-            onMouseEnter={() => onHoverDefect(d.defect_id)}
-            onMouseLeave={() => onHoverDefect(null)}
-            className={`absolute border-2 ${c.border} ${c.soft} transition-all duration-150 cursor-pointer ${isActive ? "ring-2 ring-white z-20 scale-[1.01]" : "z-10"}`}
-            style={{ ...style, position: "absolute" }}
+  // marker_radius = max(14, min(imgW, imgH) * 0.014)  — same formula as Python reference
+  const markerR = renderedSize
+    ? Math.max(14, Math.min(renderedSize.width, renderedSize.height) * 0.014)
+    : 14;
+
+  const ViewerContent = () => {
+    const W = renderedSize?.width  ?? 0;
+    const H = renderedSize?.height ?? 0;
+
+    return (
+      <div className="relative inline-block w-full select-none">
+        <img
+          ref={imgRef}
+          src={imageUrl}
+          alt="PCB Inspection"
+          onLoad={handleImgLoad}
+          draggable={false}
+          className="w-full h-auto object-contain max-h-[480px] block rounded-xl"
+        />
+
+        {showBoxes && W > 0 && (
+          <svg
+            className="absolute inset-0 pointer-events-none"
+            width={W}
+            height={H}
+            style={{ top: 0, left: 0 }}
           >
-            <span
-              className={`absolute -top-6 left-0 px-1.5 py-0.5 text-[10px] font-bold rounded whitespace-nowrap ${c.border} bg-zinc-950 ${c.text}`}
-            >
-              #{d.defect_id} {d.class_name.replaceAll("_", " ")} ({(d.confidence * 100).toFixed(0)}%)
-            </span>
-          </div>
-        );
-      })}
-    </div>
-  );
+            {defects.map((d) => {
+              const box = scaleBox(d.bbox);
+              if (!box) return null;
+
+              const c        = getColor(d.class_name);
+              const isActive = activeId === d.defect_id;
+              const alpha    = isActive ? "ff" : "cc";
+
+              // box center
+              const cx = box.x + box.w / 2;
+              const cy = box.y + box.h / 2;
+
+              // place marker at top-right corner of box, clamped inside image
+              const mx = Math.min(Math.max(box.x + box.w + markerR * 0.4, markerR + 2), W - markerR - 2);
+              const my = Math.min(Math.max(box.y - markerR * 0.4, markerR + 2), H - markerR - 2);
+
+              const strokeW = Math.max(2, Math.round(markerR / 5));
+              const fs      = Math.max(9, Math.round(markerR * 0.72));
+
+              return (
+                <g key={d.defect_id} style={{ cursor: "pointer" }} pointerEvents="all"
+                  onMouseEnter={() => onHoverDefect(d.defect_id)}
+                  onMouseLeave={() => onHoverDefect(null)}
+                >
+                  {/* Bounding box */}
+                  <rect
+                    x={box.x} y={box.y} width={box.w} height={box.h}
+                    fill="none"
+                    stroke={c.hex}
+                    strokeWidth={isActive ? strokeW + 1 : strokeW}
+                    strokeOpacity={isActive ? 1 : 0.8}
+                    rx={2}
+                  />
+                  {isActive && (
+                    <rect
+                      x={box.x} y={box.y} width={box.w} height={box.h}
+                      fill={c.hex} fillOpacity={0.08}
+                      rx={2}
+                    />
+                  )}
+
+                  {/* Leader line: marker edge → box center */}
+                  <line
+                    x1={mx} y1={my} x2={cx} y2={cy}
+                    stroke={c.hex} strokeWidth={1.5} strokeOpacity={0.6}
+                    strokeDasharray="4 3"
+                  />
+
+                  {/* Marker circle — dark outline for contrast */}
+                  <circle cx={mx} cy={my} r={markerR + 1.5} fill="#0a0a0a" fillOpacity={0.85} />
+                  <circle
+                    cx={mx} cy={my} r={markerR}
+                    fill={c.hex + alpha}
+                    stroke={isActive ? "#fff" : c.hex}
+                    strokeWidth={isActive ? 2 : 1.5}
+                  />
+
+                  {/* Detection number */}
+                  <text
+                    x={mx} y={my}
+                    textAnchor="middle" dominantBaseline="central"
+                    fontSize={fs} fontWeight="700" fill="#fff"
+                    fontFamily="system-ui, sans-serif"
+                  >
+                    {d.defect_id}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">Detected</p>
+        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
+          Detected — hover a card below to highlight
+        </p>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowBoxes(!showBoxes)}
@@ -235,9 +307,9 @@ function PCBViewer({ imageUrl, defects, activeId, onHoverDefect }) {
           className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4"
           onClick={() => setZoomed(false)}
         >
-          <div className="max-w-3xl w-full relative" onClick={(e) => e.stopPropagation()}>
+          <div className="max-w-5xl w-full relative" onClick={(e) => e.stopPropagation()}>
             <div className="relative rounded-2xl overflow-hidden border border-zinc-800 bg-black">
-              <img src={imageUrl} alt="PCB Zoomed" className="w-full h-auto object-contain max-h-[80vh]" />
+              <img src={imageUrl} alt="PCB Zoomed" className="w-full h-auto object-contain max-h-[88vh]" />
             </div>
             <button
               onClick={() => setZoomed(false)}
@@ -264,8 +336,12 @@ function DefectCard({ defect, isActive, onMouseEnter, onMouseLeave }) {
       className={`p-4 cursor-pointer transition-all duration-200 ${isActive ? "border-zinc-600 ring-1 ring-indigo-500/30" : "hover:border-zinc-700"}`}
     >
       <div className="flex items-center justify-between mb-3">
-        <div className={`rounded-lg p-2 ${c.soft} ${c.text}`}>
-          <Layers size={16} />
+        {/* Numbered badge — matches the SVG marker on the image */}
+        <div
+          className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white shrink-0"
+          style={{ background: c.hex }}
+        >
+          {defect.defect_id}
         </div>
         {ri && <SeverityPill severity={ri.severity} />}
       </div>
