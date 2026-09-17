@@ -1,86 +1,12 @@
-# PCB Vision AI — Intelligent PCB Defect Classification & Localization
+# PCB Vision AI
 
-> **Automated PCB inspection powered by YOLO, React, and FastAPI.**
+An end-to-end computer-vision application designed for automated Printed Circuit Board (PCB) quality control.
 
-PCB Vision AI is an end-to-end computer-vision application designed for automated Printed Circuit Board (PCB) quality control. It detects and localizes common PCB defects, provides detailed repair-cost estimation, and generates automated recommendations on whether a board is economically viable to repair or should be discarded.
+## Overview
 
----
+PCB Vision AI detects and localizes common PCB defects, provides detailed repair-cost estimation, and generates automated recommendations on whether a board is economically viable to repair or should be discarded. The application pairs a modern, interactive React frontend with a high-performance FastAPI backend that serves a trained YOLO segmentation model.
 
-## 🎓 S3 Lab Work Evaluation
-
-This section explicitly outlines the project's adherence to the S3 evaluation criteria.
-
-## 1. CODEBASE — 10 MARKS
-
-The application follows a strictly decoupled client-server architecture:
-- **Frontend (React + Vite):** A responsive Single Page Application (SPA) responsible for user interaction, image upload, interactive visualization (SVG bounding boxes, zooming), and data presentation.
-- **Backend (FastAPI):** A stateless REST API responsible for image processing, machine learning inference, and business logic (repair estimations).
-
-**Important Directories & Modules:**
-- `backend/api/`: Contains `router.py` and `endpoints.py` to handle HTTP requests and route them to appropriate services.
-- `backend/inference/`: Houses `yolo_service.py`, which wraps the Ultralytics YOLO model, handles model loading into memory, and executes predictions.
-- `backend/services/`: Contains business logic like `repair_estimator.py` (calculates costs based on defect types) and `history_store.py` (JSON-based persistence).
-- `frontend/src/pages/`: Page-level React components (`Results.jsx`, `Dashboard.jsx`, etc.).
-- `frontend/src/components/`: Reusable UI primitives (`Primitives.jsx`).
-
-**Inference Pipeline Workflow:**
-1. **Upload:** User uploads an image via the frontend `NewInspection.jsx` component.
-2. **API Request:** Frontend sends the image as a `multipart/form-data` payload to `/api/v1/inspection/inspect`.
-3. **Inference:** The backend decodes the image using OpenCV and passes it to the `YOLOService`. The YOLO model runs inference, producing segmentation/bounding box predictions.
-4. **Defect Parsing:** The raw model output is parsed, scaling coordinates and mapping class IDs to normalized class names (e.g., mapping `"short"` to `"short_circuit"`).
-5. **Repair Estimation:** The detected defects are fed into the `repair_estimator.py` service, which calculates labor and material costs based on predefined severities in `repair_config.py`.
-6. **Persistence & Response:** The result is saved to the local `history.json` store and returned to the frontend as a structured JSON response (validated by Pydantic schemas).
-7. **Visualization:** `Results.jsx` dynamically renders an interactive SVG overlay on the original image, displaying numbered markers and defect cards.
-
-**Model Location & Loading:**
-The model weights are located at `backend/weights/best.pt`. Upon backend startup, `yolo_service.py` initializes the `YOLO` class with this path, loading the weights into memory once to ensure low-latency inference for subsequent API calls.
-
-## 2. FRAMEWORKS WITH JUSTIFICATION — 10 MARKS
-
-| Technology / Framework | Where it is used | Why it was selected |
-|------------------------|------------------|---------------------|
-| **React** | Frontend UI | Component-based architecture allows for highly reusable UI elements (e.g., defect cards, dashboards). |
-| **Vite** | Frontend Build Tool | Extremely fast Hot Module Replacement (HMR) and optimized production builds. |
-| **Tailwind CSS** | Frontend Styling | Utility-first CSS enables rapid, responsive, and consistent UI development without context-switching. |
-| **Recharts** | Frontend Analytics | Provides declarative React components to render the inspection analytics charts. |
-| **Lucide React** | Frontend Icons | Clean, consistent, and lightweight SVG icons used throughout the interface. |
-| **FastAPI** | Backend Web Framework | High performance, automatic OpenAPI documentation, and asynchronous request handling. |
-| **Uvicorn** | Backend ASGI Server | Serves the FastAPI application with high concurrency support. |
-| **Ultralytics YOLO** | Backend Inference | State-of-the-art object detection/segmentation library with an easy-to-use Python API. |
-| **OpenCV (`cv2`)** | Backend Image Processing | Industry-standard library used to efficiently decode multipart image byte streams into NumPy arrays. |
-| **NumPy** | Backend Matrix Math | Handles the array representations of images required by the YOLO model. |
-| **Pydantic** | Backend Validation | Ensures strict type checking and schema validation for API requests and responses. |
-| **Python** | Backend Runtime | The dominant ecosystem for machine learning, AI tooling, and data processing. |
-
-## 3. CODE QUALITY — 10 MARKS
-
-The repository demonstrates several professional software engineering practices:
-- **Modular Architecture & Separation of Concerns:** The backend separates API routing (`endpoints.py`), business logic (`services/`), and ML inference (`inference/`). The frontend separates view orchestration (`App.jsx`), pages (`pages/`), and UI building blocks (`components/`).
-- **Reusable Frontend Components:** `Primitives.jsx` contains shared UI components like `GlassCard`, `MetricCard`, and `SeverityPill`, ensuring UI consistency and reducing code duplication.
-- **API/Service Separation:** Frontend network calls are abstracted into `services/api.js`, centralizing fetch logic, timeouts, and error handling.
-- **Configuration Management:** Environment variables (`.env`, `config.py`) manage API URLs, CORS origins, model paths, and detection thresholds.
-- **Type/Schema Validation:** Pydantic models (`schemas.py`) define the exact structure of all API responses (e.g., `InferenceResponse`, `RepairAnalysis`), guaranteeing API contract stability.
-- **Validation & Error Handling:** The frontend prevents uploading invalid file types/sizes before network transmission. The backend gracefully catches decoding errors and returns descriptive HTTP 400/500 errors.
-- **Readable Naming & Structure:** Variables and functions use descriptive names (`estimate_repair`, `build_inspection_record`). The codebase avoids magic strings by using config constants.
-- **Smoke Testing:** A dedicated smoke test (`scratch/smoke_test.py`) verifies model loading, class alias mappings, inference shape, and empty-state handling.
-- **Maintainability:** Class name mismatches between the YOLO model and the business logic are handled gracefully via a centralized alias map in `yolo_service.py`, avoiding hardcoded hacks throughout the codebase.
-
-## 4. NON-FUNCTIONAL REQUIREMENTS — 10 MARKS
-
-| Requirement | How it is addressed | Evidence / Implementation Detail |
-|-------------|---------------------|----------------------------------|
-| **Usability** | Clear, interactive visualizations for tiny PCB defects. | `Results.jsx` uses dynamic SVG overlays (numbered markers, leader lines) instead of unreadable inline text on small bounding boxes. |
-| **Responsiveness** | UI adapts to desktop, tablet, and mobile displays. | Extensive use of Tailwind CSS responsive prefixes (`md:`, `lg:`) and CSS Grid/Flexbox layouts. |
-| **Maintainability** | Clean separation of business logic and inference. | `repair_estimator.py` uses a declarative `DEFECT_COST_TABLE`, making cost/time adjustments trivial without altering inference code. |
-| **Error Handling** | Robust handling of network failures and invalid inputs. | `api.js` implements a `withTimeout` wrapper (30s/60s). `endpoints.py` validates image decoding with OpenCV before inference. |
-| **Performance** | Model weights are cached in memory to avoid reload overhead. | `yolo_service.py` loads the `YOLO()` instance during the `__init__` phase upon application startup, providing rapid subsequent inference. |
-| **Compatibility** | Built on cross-platform technologies. | The frontend architecture supports modern web browsers, and the backend utilizes standard Python/FastAPI which is supported across Windows, Linux, and macOS environments. |
-
-*(Note: Horizontal scalability is currently limited by the use of a local JSON file for history storage. True scalability would require swapping `history_store.py` with a relational database like PostgreSQL.)*
-
----
-
-## 🚀 Features
+## Features
 
 - **YOLO-based PCB Defect Localization:** High-accuracy instance segmentation model adapted for object detection.
 - **Interactive Visualization:** Dynamic SVG overlays with numbered markers, leader lines, and side-legend defect cards for readability of microscopic defects.
@@ -89,37 +15,204 @@ The repository demonstrates several professional software engineering practices:
 - **Robust API:** Documented FastAPI backend with Pydantic validation.
 - **Windows Launcher:** Included `launcher.py` script for one-click local startup of both frontend and backend.
 
----
+## Architecture
 
-## 🖼️ Workflow & Pipeline
+┌─────────────────────────────────────────────────────────────┐
+│                      APPLICATION                            │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  React Frontend                                             │
+│        │                                                    │
+│        │ REST API                                           │
+│        ▼                                                    │
+│  FastAPI Backend                                            │
+│        │                                                    │
+│        ├── Image Processing                                 │
+│        ├── YOLO Inference                                   │
+│        ├── Repair Analysis                                  │
+│        └── Inspection History                               │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 
-1. **Dashboard:** View overall metrics, recent inspections, and defect trends.
-2. **New Inspection:** Drag-and-drop a PCB image for analysis.
-3. **Processing:** The frontend polls the backend while YOLO inference executes.
-4. **Results:** The original image is displayed alongside SVG bounding boxes. A repair viability analysis determines if the board should be repaired or discarded.
-5. **Analytics:** All results are aggregated into the Analytics tab.
+## Data & Model Pipeline
 
----
+┌─────────────────────────────────────────────────────────────┐ 
+│                    DATA & MODEL PIPELINE                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  PKU-PCB / HRIPCB                                           │
+│        │                                                    │
+│        ▼                                                    │
+│  Bounding-Box Annotations                                   │
+│        │                                                    │
+│        ▼                                                    │
+│  SAM → Segmentation Masks                                   │
+│        │                                                    │
+│        ▼                                                    │
+│  Train & Evaluate                                           │
+│        │                                                    │
+│        ├───────────────┬─────────────────┐                  │
+│        ▼               ▼                 │                  │
+│   YOLOv8-seg      Mask R-CNN             │                  │
+│        │               │                 │                  │
+│        └───────────────┴─────────────────┘                  │
+│                        │                                    │
+│                        ▼                                    │
+│                 Model Evaluation                            │
+│                        │                                    │
+│                        ▼                                    │
+│                  Model Registry                             │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         │ Deployed Model
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                         BACKEND                             │
+│                 Python + FastAPI + Uvicorn                  │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  Image Upload                                               │
+│       │                                                     │
+│       ▼                                                     │
+│  Image Decoding / Preprocessing                             │
+│       │                                                     │
+│       ▼                                                     │
+│  YOLO-based Inference Pipeline                              │
+│       │                                                     │
+│       ▼                                                     │
+│  Post-processing                                            │
+│  • Filtering                                                │
+│  • Mask Overlay Generation                                  │
+│       │                                                     │
+│       ▼                                                     │
+│  Structured Inspection Result                               │
+│       │                                                     │
+│       ├── Defect Class                                      │
+│       ├── Confidence                                        │
+│       ├── Bounding-box Location                             │
+│       └── Defect Count                                      │
+│       │                                                     │
+│       ▼                                                     │
+│  Repair Analysis                                            │
+│       │                                                     │
+│       ├── Repair Time                                       │
+│       ├── Labour Cost                                       │
+│       ├── Material Cost                                     │
+│       ├── Setup Cost                                        │
+│       └── Replacement Cost                                  │
+│       │                                                     │
+│       ▼                                                     │
+│  Repair / Discard Decision                                  │
+│                                                             │
+└────────────────────────┬────────────────────────────────────┘
+                         │
+                         │ REST API Response
+                         ▼
+┌─────────────────────────────────────────────────────────────┐
+│                        FRONTEND                             │
+│              React + Vite + Tailwind CSS                    │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  PCB Image Upload                                           │
+│       │                                                     │
+│       ▼                                                     │
+│  Processing / Loading State                                 │
+│       │                                                     │
+│       ▼                                                     │
+│  Inspection Results                                         │
+│       │                                                     │
+│       ├── Detection Overlays                                │
+│       ├── Defect Names                                      │
+│       ├── Confidence Scores                                 │
+│       ├── Zoomed Defect Regions                             │
+│       └── Defect Severity                                   │
+│       │                                                     │
+│       ▼                                                     │
+│  Repair / Discard Recommendation                            │
+│       │                                                     │
+│       ├── Estimated Cost                                    │
+│       ├── Repair Time                                       │
+│       └── Repair Guidance                                   │
+│       │                                                     │
+│       ▼                                                     │
+│  Inspection History & Analytics                             │
+└─────────────────────────────────────────────────────────────┘
 
-## 🏗️ Architecture
+## Model Development
 
-```text
-React + Vite Frontend (SPA)
-        │
-        │ HTTP / JSON (via services/api.js)
-        ▼
-FastAPI Backend (app.py)
-        │
-        ├── 🧠 Inference (yolo_service.py) ─── loads ──▶ backend/weights/best.pt
-        │
-        ├── 🛠️ Business Logic (repair_estimator.py)
-        │
-        └── 💾 Storage (history_store.py) ────── reads/writes ──▶ data/history.json
-```
+The model development pipeline processes the raw PCB defect dataset and trains multiple models to determine the best candidate for deployment.
 
----
+1. **Dataset Preparation:** The pipeline utilizes the PKU-PCB / HRIPCB dataset. The script `scripts/01_convert_voc_to_yolo.py` converts the original PASCAL VOC bounding-box annotations into the YOLO detection format and creates training/validation splits.
+2. **Segmentation Mask Generation:** Using the Segment Anything Model (SAM), `scripts/02_generate_masks_sam.py` processes the bounding boxes to generate segmentation polygons for the defects.
+3. **Training Track A (YOLOv8-seg):** YOLOv8-seg is trained (`scripts/03_train.py`) and evaluated (`scripts/04_evaluate.py`) for its speed and real-time performance.
+4. **Training Track B (Mask R-CNN):** The segmentation labels are converted to COCO JSON format (`scripts/06_convert_yolo_to_coco.py`) to train a Mask R-CNN model (`scripts/07_train_maskrcnn.py` and `scripts/08_evaluate_maskrcnn.py`).
+5. **Evaluation:** Both model tracks are evaluated during the development process, and the resulting model artifacts are used to identify a suitable candidate for application deployment. The chosen model's inference logic is built into a standard JSON output contract that serves the backend API.
+6. **Cost Logic Integration:** Scripts such as `scripts/11_estimate_repair_cost.py` and `scripts/cost_estimation.py` prototype the repair-cost estimation and repair/discard decision logic before integration into the backend service.
 
-## 📁 Project Structure
+## Model Details
+
+- **Deployed Model:** Ultralytics YOLO (Segmentation model).
+- **Current Application Behavior:** The application currently relies on the model's bounding-box predictions for defect localization. The frontend draws interactive bounding boxes (SVG) around detected defects based on the API response.
+- **Normalization:** The model natively predicts `short`, which the `yolo_service.py` component gracefully aliases to `short_circuit` to match downstream business logic without requiring model retraining.
+- **Persistence:** Model weights (`best.pt`) are loaded into memory once on backend startup by `yolo_service.py` to ensure low-latency inference.
+
+## Defect Classes
+
+The trained model identifies six critical PCB manufacturing defects:
+
+1. **Open Circuit:** A break in a copper trace interrupting the electrical path.
+2. **Short Circuit:** Unintended copper bridging two traces that should be isolated.
+3. **Mouse Bite:** Small notches eroded into a trace or pad edge.
+4. **Missing Hole:** A drilled via or mounting hole is absent.
+5. **Spurious Copper:** Unwanted copper residue left on the laminate.
+6. **Spur:** A stray copper protrusion branching off an existing trace.
+
+## Repair Analysis and Cost Estimation
+
+For each detected defect, the backend evaluates the physical defect type against predefined definitions (`repair_config.py`) to estimate:
+- **Base Repair Cost & Material Cost** (₹)
+- **Repair Time** (minutes)
+- **Severity** (Critical, Medium, Low)
+
+The system compares the total estimated repair cost against a configurable `REPLACEMENT_COST` to output a recommendation: **REPAIR**, **REPAIR WITH CAUTION**, or **DISCARD PCB**. Multiple critical defects can also automatically trigger a DISCARD recommendation.
+
+## Frameworks and Technology Choices
+
+- **React:** Component-based frontend architecture allows for highly reusable UI elements (e.g., defect cards, dashboards).
+- **Vite:** Frontend build tool offering fast Hot Module Replacement (HMR) and optimized production builds.
+- **Tailwind CSS:** Utility-first CSS enables rapid, responsive, and consistent UI development.
+- **Recharts:** Provides declarative React components to render the inspection analytics charts.
+- **Lucide React:** Clean, consistent, and lightweight SVG icons used throughout the interface.
+- **FastAPI:** High-performance backend web framework with automatic OpenAPI documentation and asynchronous request handling.
+- **Uvicorn:** ASGI Server that serves the FastAPI application with high concurrency support.
+- **Ultralytics YOLO:** State-of-the-art object detection and segmentation library handling the core model inference.
+- **OpenCV (`cv2`):** Industry-standard library used to efficiently decode multipart image byte streams into NumPy arrays.
+- **NumPy:** Handles the array representations of images required for YOLO model inference.
+- **Pydantic:** Ensures strict type checking and schema validation for API requests and responses.
+- **Python:** The runtime for the backend, offering a strong ecosystem for machine learning and data processing.
+
+## Code Quality and Maintainability
+
+- **Modular Architecture & Separation of Concerns:** The backend cleanly separates API routing (`endpoints.py`), business logic (`services/`), and ML inference (`inference/`). The frontend separates view orchestration (`App.jsx`), pages (`pages/`), and UI building blocks (`components/`).
+- **Reusable Frontend Components:** Shared UI components (like `GlassCard`, `MetricCard`, and `SeverityPill` in `Primitives.jsx`) ensure UI consistency and reduce code duplication.
+- **API/Service Separation:** Frontend network calls are abstracted into `services/api.js`, centralizing fetch logic, timeouts, and error handling.
+- **Configuration Management:** Environment variables (`.env`, `config.py`) cleanly manage API URLs, CORS origins, model paths, and detection thresholds without hardcoded secrets.
+- **Type/Schema Validation:** Pydantic models (`schemas.py`) strictly define the shape of API responses, guaranteeing API contract stability between the backend and frontend.
+- **Error Handling:** The frontend prevents uploading invalid file types or sizes before network transmission. The backend catches decoding errors and returns descriptive HTTP 400/500 errors.
+- **Maintainability:** Discrepancies like class name mismatches between the YOLO model outputs and the backend business logic are handled gracefully via a centralized alias map, avoiding scattered hardcoded hacks.
+- **Smoke Testing:** A dedicated smoke test (`scratch/smoke_test.py`) verifies model loading, class mappings, inference logic, and empty-state handling to ensure robust deployment updates.
+
+## Non-Functional Requirements
+
+- **Usability:** The UI provides clear, interactive visualizations (e.g., numbered markers, leader lines) for tiny PCB defects rather than unreadable inline text, greatly enhancing readability.
+- **Responsiveness:** The interface adapts gracefully to desktop, tablet, and mobile displays via extensive use of CSS Grid/Flexbox layouts and responsive classes.
+- **Maintainability:** Clean separation of business logic and inference ensures that adjusting repair cost logic (`DEFECT_COST_TABLE`) does not require altering the inference code.
+- **Error Handling:** Robust handling of network failures is implemented, such as request timeouts in the frontend network wrapper and input validation on the backend API.
+- **Performance:** Model weights are cached in memory during application startup to avoid reload overhead, providing fast subsequent API responses.
+- **Compatibility:** Built on cross-platform web technologies and standard Python/FastAPI, supporting execution across Windows, Linux, and macOS environments.
+- **Scalability Limitations:** Horizontal scalability is currently limited by the use of a local JSON file (`data/history.json`) for persistence. True scalability across multiple instances would require migrating to a relational database like PostgreSQL.
+
+## Project Structure
 
 ```text
 PCB-Vision-AI/
@@ -144,22 +237,7 @@ PCB-Vision-AI/
 └── README.md
 ```
 
----
-
-## 🔍 Defect Classes
-
-The trained model identifies six critical PCB manufacturing defects:
-
-1. **Open Circuit:** A break in a copper trace interrupting the electrical path.
-2. **Short Circuit:** Unintended copper bridging two traces that should be isolated.
-3. **Mouse Bite:** Small notches eroded into a trace or pad edge.
-4. **Missing Hole:** A drilled via or mounting hole is absent.
-5. **Spurious Copper:** Unwanted copper residue left on the laminate.
-6. **Spur:** A stray copper protrusion branching off an existing trace.
-
----
-
-## 💻 Local Development
+## Local Development
 
 ### Prerequisites
 
@@ -213,7 +291,7 @@ The application will be available at `http://localhost:5173`.
 
 ---
 
-## 🖥️ Windows Launcher
+### Windows Launcher
 
 For a seamless local desktop experience, run the included Python launcher. It automatically starts both the backend API and the Vite frontend dev server, and opens the application in your default browser.
 
@@ -221,9 +299,7 @@ For a seamless local desktop experience, run the included Python launcher. It au
 python launcher/launcher.py
 ```
 
----
-
-## 🌐 API Endpoints
+## API Endpoints
 
 Base URL: `/api/v1`
 
@@ -234,9 +310,7 @@ Base URL: `/api/v1`
 | GET | `/inspection/history` | Retrieve paginated inspection history |
 | GET | `/inspection/analytics` | Retrieve aggregated analytics (pass/fail ratios, trends) |
 
----
-
-## ☁️ Deployment
+## Deployment
 
 ### Frontend — Vercel
 
@@ -257,42 +331,17 @@ uvicorn backend.app:app --host 0.0.0.0 --port $PORT
 ```
 Set the `BACKEND_CORS_ORIGINS` environment variable to your Vercel deployment URL to allow cross-origin requests.
 
----
-
-## 🤖 Model Details
-
-- **Type:** Ultralytics YOLO (Segmentation task used for detection)
-- **Path:** `backend/weights/best.pt`
-- **Normalization:** The model natively predicts `short`, which the `yolo_service.py` elegantly aliases to `short_circuit` to match downstream business logic without requiring model retraining.
-
----
-
-## 🛠️ Repair Viability Engine
-
-For each defect, the backend evaluates the physical defect type against the `repair_config.py` definitions to estimate:
-- **Base Repair Cost & Material Cost** (₹)
-- **Repair Time** (minutes)
-- **Severity** (Critical, Medium, Low)
-
-The system compares the total estimated repair cost against a defined `REPLACEMENT_COST` to output a recommendation: **REPAIR**, **REPAIR WITH CAUTION**, or **DISCARD PCB**. (Note: ≥2 Critical defects forces an automatic DISCARD recommendation).
-
----
-
-## 🧪 Testing & Validation
+## Testing & Validation
 
 - **Smoke Tests:** A `smoke_test.py` script validates model loading, alias mapping, inference pipeline integrity, and confidence threshold configurations.
 - **Frontend Fallbacks:** UI components degrade gracefully (e.g., displaying Empty States) when data is missing or network connectivity drops.
 
----
-
-## 🔮 Limitations and Future Scope
+## Limitations and Future Scope
 
 - **Horizontal Scaling:** The current history store relies on a local JSON file (`data/history.json`), which prevents horizontal scaling of the backend. Future versions should migrate to PostgreSQL/SQLite.
 - **Segmentation Masks:** The current YOLO model is a segmentation model, but the application currently utilizes its bounding-box predictions for defect localization. Future UI and backend updates could extract and render precise SVG polygons from the segmentation masks.
 - **Authentication:** The application currently lacks user authentication and role-based access control (RBAC).
 
----
-
-## 📜 License
+## License
 
 *(Add intended license here)*
