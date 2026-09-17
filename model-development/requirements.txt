@@ -1,0 +1,16 @@
+ultralytics>=8.2.0
+segment-anything
+torch
+torchvision
+opencv-python
+lxml
+pyyaml
+tqdm
+numpy
+pycocotools
+matplotlib
+
+# Detectron2 (for the optional Mask R-CNN comparison track) is not a normal
+# PyPI package — install separately per your CUDA/torch version, e.g.:
+#   pip install 'git+https://github.com/facebookresearch/detectron2.git'
+# See: https://detectron2.readthedocs.io/en/latest/tutorials/install.html

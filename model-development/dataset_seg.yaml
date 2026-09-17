@@ -1,0 +1,15 @@
+# YOLOv8-seg dataset config
+# 'dataset_seg/' is auto-built by scripts/03_train.py (it mirrors
+# dataset/images -> dataset_seg/images and dataset/labels_seg -> dataset_seg/labels
+# so Ultralytics' automatic images->labels path convention resolves correctly).
+path: dataset_seg
+train: images/train
+val: images/val
+
+names:
+  0: missing_hole
+  1: mouse_bite
+  2: open_circuit
+  3: short
+  4: spur
+  5: spurious_copper
