@@ -17,6 +17,7 @@ PCB Vision AI detects and localizes common PCB defects, provides detailed repair
 
 ## Architecture
 
+```text
 ┌─────────────────────────────────────────────────────────────┐
 │                      APPLICATION                            │
 ├─────────────────────────────────────────────────────────────┤
@@ -33,9 +34,11 @@ PCB Vision AI detects and localizes common PCB defects, provides detailed repair
 │        └── Inspection History                               │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
+```
 
 ## Data & Model Pipeline
 
+```text
 ┌─────────────────────────────────────────────────────────────┐ 
 │                    DATA & MODEL PIPELINE                    │
 ├─────────────────────────────────────────────────────────────┤
@@ -137,6 +140,7 @@ PCB Vision AI detects and localizes common PCB defects, provides detailed repair
 │       ▼                                                     │
 │  Inspection History & Analytics                             │
 └─────────────────────────────────────────────────────────────┘
+```
 
 ## Model Development
 
