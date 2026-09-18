@@ -1,0 +1,3 @@
+[tool.mutmut]
+source_paths = ["backend/inference"]
+pytest_add_cli_args_test_selection = ["tests/"]
