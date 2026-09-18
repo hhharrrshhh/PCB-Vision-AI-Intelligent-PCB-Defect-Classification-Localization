@@ -2,8 +2,6 @@ name: Code Metrics - Radon & Mutmut
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
 
 jobs:
   code-metrics:
@@ -26,26 +24,45 @@ jobs:
 
       - name: Run Radon - Cyclomatic Complexity
         run: |
-          echo "=== Cyclomatic Complexity ==="
-          radon cc backend model-development -s
+          {
+            echo "=== Cyclomatic Complexity ==="
+            radon cc backend model-development -s
+          } | tee -a code-metrics-report.txt
 
       - name: Run Radon - Maintainability Index
         run: |
-          echo "=== Maintainability Index ==="
-          radon mi backend model-development -s
+          {
+            echo "=== Maintainability Index ==="
+            radon mi backend model-development -s
+          } | tee -a code-metrics-report.txt
 
       - name: Run Radon - Raw Metrics
         run: |
-          echo "=== Raw Metrics ==="
-          radon raw backend model-development -s
+          {
+            echo "=== Raw Metrics ==="
+            radon raw backend model-development -s
+          } | tee -a code-metrics-report.txt
 
       - name: Run Mutmut
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: |
-          mutmut run "backend.inference.yolo_service.*" || true
+          {
+            echo "=== Mutation Testing Run ==="
+            mutmut run "backend.inference.yolo_service.*" || true
+          } | tee -a code-metrics-report.txt
 
       - name: Export Mutation Results
         run: |
-          echo "=== Mutation Testing Results ==="
-          mutmut results || true
+          {
+            echo "=== Mutation Testing Results ==="
+            mutmut results || true
+          } | tee -a code-metrics-report.txt
+
+      - name: Upload Code Metrics Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: code-metrics-report
+          path: code-metrics-report.txt
+          if-no-files-found: error
