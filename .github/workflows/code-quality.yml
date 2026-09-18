@@ -28,4 +28,6 @@ jobs:
         run: ruff check backend model-development scratch --exit-zero
 
       - name: Run PyTest
-        run: pytest -q
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: pytest -q tests
