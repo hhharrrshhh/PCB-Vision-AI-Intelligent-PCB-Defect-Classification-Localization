@@ -1,0 +1,51 @@
+name: Code Metrics - Radon & Mutmut
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  code-metrics:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest torch radon mutmut
+
+      - name: Run Radon - Cyclomatic Complexity
+        run: |
+          echo "=== Cyclomatic Complexity ==="
+          radon cc backend model-development -s
+
+      - name: Run Radon - Maintainability Index
+        run: |
+          echo "=== Maintainability Index ==="
+          radon mi backend model-development -s
+
+      - name: Run Radon - Raw Metrics
+        run: |
+          echo "=== Raw Metrics ==="
+          radon raw backend model-development -s
+
+      - name: Run Mutmut
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+        run: |
+          mutmut run "backend.inference.yolo_service.*" || true
+
+      - name: Export Mutation Results
+        run: |
+          echo "=== Mutation Testing Results ==="
+          mutmut results || true
