@@ -1,3 +1,5 @@
 [tool.mutmut]
 source_paths = ["backend/inference"]
 pytest_add_cli_args_test_selection = ["tests/"]
+pytest_add_cli_args = ["-o", "pythonpath=."]
+also_copy = ["backend/core"]
