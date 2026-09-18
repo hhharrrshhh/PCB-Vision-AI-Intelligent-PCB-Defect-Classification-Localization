@@ -180,6 +180,22 @@ For each detected defect, the backend evaluates the physical defect type against
 
 The system compares the total estimated repair cost against a configurable `REPLACEMENT_COST` to output a recommendation: **REPAIR**, **REPAIR WITH CAUTION**, or **DISCARD PCB**. Multiple critical defects can also automatically trigger a DISCARD recommendation.
 
+## Model — Frameworks and Technology Choices
+
+| Framework | Purpose | Why Used |
+|---|---|---|
+| **Ultralytics YOLOv8-seg** | Object detection and instance segmentation | Fast inference and efficient segmentation, making it suitable for real-time inspection. |
+| **Detectron2 (Mask R-CNN)** | Instance segmentation | Two-stage architecture provides stronger localization of small and irregular defects. |
+| **SAM (Segment Anything Model)** | Segmentation mask generation | Generates segmentation masks from the dataset's existing bounding-box annotations, avoiding manual pixel annotation. |
+| **PyTorch** | Deep-learning framework | Common underlying framework for the model training and inference pipelines. |
+
+## Model — Non-Functional Requirements
+
+| NFR | Evidence |
+|---|---|
+| **Performance** | **YOLOv8-seg: 6.5 ms/image (~154 images/s)** on a T4 GPU. **Mask R-CNN: ~90 ms/image (~11 images/s)**; timing is estimated. |
+| **Maintainability** | Model loading and inference are isolated into reusable common modules, reducing code duplication and allowing model-related changes without modifying multiple application components. |
+
 ## Frameworks and Technology Choices
 
 - **React:** Component-based frontend architecture allows for highly reusable UI elements (e.g., defect cards, dashboards).
@@ -189,9 +205,7 @@ The system compares the total estimated repair cost against a configurable `REPL
 - **Lucide React:** Clean, consistent, and lightweight SVG icons used throughout the interface.
 - **FastAPI:** High-performance backend web framework with automatic OpenAPI documentation and asynchronous request handling.
 - **Uvicorn:** ASGI Server that serves the FastAPI application with high concurrency support.
-- **Ultralytics YOLO:** State-of-the-art object detection and segmentation library handling the core model inference.
 - **OpenCV (`cv2`):** Industry-standard library used to efficiently decode multipart image byte streams into NumPy arrays.
-- **NumPy:** Handles the array representations of images required for YOLO model inference.
 - **Pydantic:** Ensures strict type checking and schema validation for API requests and responses.
 - **Python:** The runtime for the backend, offering a strong ecosystem for machine learning and data processing.
 
@@ -210,9 +224,7 @@ The system compares the total estimated repair cost against a configurable `REPL
 
 - **Usability:** The UI provides clear, interactive visualizations (e.g., numbered markers, leader lines) for tiny PCB defects rather than unreadable inline text, greatly enhancing readability.
 - **Responsiveness:** The interface adapts gracefully to desktop, tablet, and mobile displays via extensive use of CSS Grid/Flexbox layouts and responsive classes.
-- **Maintainability:** Clean separation of business logic and inference ensures that adjusting repair cost logic (`DEFECT_COST_TABLE`) does not require altering the inference code.
 - **Error Handling:** Robust handling of network failures is implemented, such as request timeouts in the frontend network wrapper and input validation on the backend API.
-- **Performance:** Model weights are cached in memory during application startup to avoid reload overhead, providing fast subsequent API responses.
 - **Compatibility:** Built on cross-platform web technologies and standard Python/FastAPI, supporting execution across Windows, Linux, and macOS environments.
 - **Scalability Limitations:** Horizontal scalability is currently limited by the use of a local JSON file (`data/history.json`) for persistence. True scalability across multiple instances would require migrating to a relational database like PostgreSQL.
 
@@ -220,6 +232,21 @@ The system compares the total estimated repair cost against a configurable `REPL
 
 ```text
 PCB-Vision-AI/
+├── model-development/          # Data pipeline, training, and evaluation scripts
+│   └── scripts/
+│       ├── 01_convert_voc_to_yolo.py    # PASCAL VOC boxes -> YOLO format + train/val split
+│       ├── 02_generate_masks_sam.py     # SAM-generated segmentation masks from boxes
+│       ├── 03_train.py                  # Train YOLOv8-seg (Track A)
+│       ├── 04_evaluate.py               # Evaluate YOLOv8-seg (mAP@0.5)
+│       ├── 05_infer.py                  # Single-image inference (YOLOv8-seg)
+│       ├── 06_convert_yolo_to_coco.py   # YOLO-seg labels -> COCO format
+│       ├── 07_train_maskrcnn.py         # Train Mask R-CNN (Track B, Detectron2)
+│       ├── 08_evaluate_maskrcnn.py      # Evaluate Mask R-CNN (COCO metrics)
+│       ├── 09_visualize.py              # Numbered-marker + legend-panel visualization
+│       ├── 11_estimate_repair_cost.py   # Repair/scrap cost estimation prototype
+│       ├── cost_estimation.py           # Repair/scrap cost logic
+│       ├── inference_common.py          # Shared YOLOv8-seg inference logic
+│       └── maskrcnn_common.py           # Shared Detectron2/Mask R-CNN config
 ├── frontend/                  # React + Vite application
 │   ├── src/
 │   │   ├── components/        # Reusable UI primitives (GlassCard, etc.)
